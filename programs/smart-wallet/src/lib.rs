@@ -44,7 +44,7 @@ pub const DEFAULT_GRACE_PERIOD: i64 = 14 * SECONDS_PER_DAY;
 /// Constant declaring that there is no ETA of the transaction.
 pub const NO_ETA: i64 = -1;
 
-declare_id!("smaK3fwkA7ubbxEhsimp1iqPTzfS4MBsNL77QLABZP6");
+declare_id!("3V3UUik5YwwVc52cUsEgWKfXPJktcdcoxyFK1tcYLLVt");
 
 #[program]
 /// Smart wallet program.

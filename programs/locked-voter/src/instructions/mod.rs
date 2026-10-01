@@ -9,6 +9,7 @@ pub mod new_locker;
 pub mod set_locker_params;
 pub mod set_vote_delegate;
 pub mod toggle_max_lock;
+pub mod voting_power;
 pub mod withdraw;
 
 pub use activate_proposal::*;
@@ -20,4 +21,5 @@ pub use new_locker::*;
 pub use set_locker_params::*;
 pub use set_vote_delegate::*;
 pub use toggle_max_lock::*;
+pub use voting_power::*;
 pub use withdraw::*;

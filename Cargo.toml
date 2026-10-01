@@ -1,11 +1,6 @@
 [workspace]
 members = [
     "programs/*",
-    "cli/govern",
-    "cli/merkle_distributor",
-    "cli/met-voter",
-    "cli/locked-voter",
-    "cli/smartwallet",
 ]
 resolver = "2"
 

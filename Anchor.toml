@@ -13,8 +13,6 @@ cluster = "localnet"
 wallet = "./tests/test-key.json"
 
 [programs.localnet]
-smart_wallet = "smaK3fwkA7ubbxEhsimp1iqPTzfS4MBsNL77QLABZP6"
-govern = "GovaE4iu227srtG2s3tZzB4RmWBzw8sTwrCLZz7kN7rY"
-met_voter = "voteXZxajNhmCGpqzBhVArCANMKra5nwqtaaLA6v9CX"
-locked_voter = "voTpe3tHQ7AjQHMapgSue2HJFAh2cGsdokqN3XqmVSj"
-merkle_distributor = "MRKgRBL5XCCT5rwUGnim4yioq9wR4c6rj2EZkw8KdyZ"
+smart_wallet = "3V3UUik5YwwVc52cUsEgWKfXPJktcdcoxyFK1tcYLLVt"
+govern = "9NwSsrDnRHki6YLJsejccdx2Bu5JUn1fMYdoyPZ1ZtMu"
+locked_voter = "HfPBCZ4QxAXRLkvPBWJL2xtfmLKXcZfbNv7oUagWsxTi"

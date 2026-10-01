@@ -1,0 +1,38 @@
+lobby token lock
+
+This repository is distributed under the GNU Affero General Public License,
+version 3. See LICENSE.
+
+Origin of the code
+
+  This repository is a fork of https://github.com/TeamRaccoons/WAGMI at commit
+  fd36cc25b99848a02476156e8f7fcad8589e83de. The WAGMI README states that the
+  project is licensed under the Apache License 2.0. A copy of that licence is in
+  licenses/Apache-2.0.txt.
+
+  The WAGMI programs are in turn derived from earlier open source projects:
+
+    programs/locked-voter   from Tribeca, https://github.com/TribecaHQ/tribeca   AGPL-3.0
+    programs/govern         from Tribeca, https://github.com/TribecaHQ/tribeca   AGPL-3.0
+    programs/smart-wallet   from Goki,    https://github.com/GokiProtocol/goki   AGPL-3.0
+    libs/vipers             from Saber,   https://github.com/saber-hq/vipers     Apache-2.0
+
+  Because three of the four components descend from AGPL-3.0 code, this fork and
+  our changes to it are offered under AGPL-3.0. That licence can be satisfied
+  whichever of the upstream licence statements applies.
+
+Changes from WAGMI at the fork commit
+
+  programs/govern/src/lib.rs                               program ID
+  programs/smart-wallet/src/lib.rs                         program ID
+  programs/locked-voter/src/lib.rs                         program ID, voting_power instruction
+  programs/locked-voter/src/instructions/voting_power.rs   new file
+  programs/locked-voter/src/instructions/mod.rs            module export
+  Anchor.toml, Cargo.toml, Cargo.lock                      reduced to the three programs above
+  tests/                                                   helpers reduced to the three programs, two stale reward tests reordered, voting_power test added
+
+  Removed: programs/met-voter, programs/merkle-distributor, cli, .github, and
+  their tests. None of them is compiled into the three programs.
+
+  Added: AUDIT_SCOPE.md, README.md, LICENSE, NOTICE, licenses/, build.sh,
+  reference/, and a copy of the Offside Labs audit report in audits/.

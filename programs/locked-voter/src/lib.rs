@@ -17,7 +17,7 @@ mod state;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("voTpe3tHQ7AjQHMapgSue2HJFAh2cGsdokqN3XqmVSj");
+declare_id!("HfPBCZ4QxAXRLkvPBWJL2xtfmLKXcZfbNv7oUagWsxTi");
 
 /// Locked voter program.
 #[deny(missing_docs)]
@@ -96,6 +96,11 @@ pub mod locked_voter {
     #[access_control(ctx.accounts.validate())]
     pub fn set_locker_params(ctx: Context<SetLockerParams>, params: LockerParams) -> Result<()> {
         ctx.accounts.set_locker_params(params)
+    }
+
+    /// Returns the current voting power of an [Escrow].
+    pub fn voting_power(ctx: Context<VotingPower>) -> Result<u64> {
+        ctx.accounts.escrow.voting_power(&ctx.accounts.locker)
     }
 }
 

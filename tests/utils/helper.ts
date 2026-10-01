@@ -1,13 +1,10 @@
 import { AnchorError, BN, Program, Wallet, web3 } from "@coral-xyz/anchor";
 import { Govern } from "../../target/types/govern";
 import { SmartWallet } from "../../target/types/smart_wallet";
-import { MetVoter } from "../../target/types/met_voter";
 import { LockedVoter } from "../../target/types/locked_voter";
 import {
   GOVERN_PROGRAM_ID,
-  MERKLE_DISTRIBUTOR_PROGRAM_ID,
   SMART_WALLET_PROGRAM_ID,
-  MET_VOTER_PROGRAM_ID,
 } from "./program";
 import {
   createAssociatedTokenAccountInstruction,
@@ -16,7 +13,6 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
-import { MerkleDistributor } from "../../target/types/merkle_distributor";
 
 export interface IProposalInstruction {
   programId: web3.PublicKey;
@@ -49,13 +45,6 @@ export function deriveVote(voter: web3.PublicKey, proposal: web3.PublicKey) {
   );
 }
 
-export function deriveDistributor(basePubkey: web3.PublicKey) {
-  return web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("MerkleDistributor"), basePubkey.toBytes()],
-    MERKLE_DISTRIBUTOR_PROGRAM_ID
-  );
-}
-
 export function deriveSmartWallet(basePubkey: web3.PublicKey) {
   return web3.PublicKey.findProgramAddressSync(
     [Buffer.from("SmartWallet"), basePubkey.toBytes()],
@@ -74,17 +63,6 @@ export function deriveLocker(basePubkey: web3.PublicKey, programId: web3.PublicK
   return web3.PublicKey.findProgramAddressSync(
     [Buffer.from("Locker"), basePubkey.toBytes()],
     programId
-  );
-}
-
-export function deriveClaimStatus(index: BN, distributor: web3.PublicKey) {
-  return web3.PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("ClaimStatus"),
-      new Uint8Array(index.toBuffer("le", 8)),
-      distributor.toBytes(),
-    ],
-    MERKLE_DISTRIBUTOR_PROGRAM_ID
   );
 }
 
@@ -242,47 +220,6 @@ export async function createProposalMeta(
   return proposalMeta;
 }
 
-export async function createDistributor(
-  baseKeypair: web3.Keypair,
-  locker: web3.PublicKey,
-  maxTotalClaim: BN,
-  maxNodesClaimed: BN,
-  root: Buffer,
-  rewardMint: web3.PublicKey,
-  mdProgram: Program<MerkleDistributor>
-) {
-  const [distributor, _bump] = deriveDistributor(baseKeypair.publicKey);
-  const tokenVault = getAssociatedTokenAddressSync(rewardMint, distributor, true);
-  const clawbackReceiver = await getOrCreateATA(rewardMint, baseKeypair.publicKey, baseKeypair, mdProgram.provider.connection);
-  console.log("Creating distributor", distributor.toBase58());
-
-  const tx = await mdProgram.methods
-    .newDistributor(
-      locker,
-      Array.from(new Uint8Array(root)),
-      maxTotalClaim,
-      maxNodesClaimed,
-      new BN(999999999999),
-    )
-    .accounts({
-      base: baseKeypair.publicKey,
-      distributor,
-      mint: rewardMint,
-      tokenVault,
-      admin: mdProgram.provider.publicKey,
-      systemProgram: web3.SystemProgram.programId,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      clawbackReceiver,
-    })
-    .signers([baseKeypair])
-    .rpc();
-
-  console.log("Create distributor tx", tx);
-
-  return distributor;
-}
-
 export async function createSmartWallet(
   owners: web3.PublicKey[],
   maxOwners: number,
@@ -374,48 +311,6 @@ export async function createGovernor(
 
   return governor;
 }
-
-export async function createMetLocker(
-  expiration: BN,
-  maxStakeDuration: BN,
-  maxStakeVoteMultiplier: number,
-  minStakeDuration: BN,
-  proposalActivationMinVotes: BN,
-  baseKeypair: web3.Keypair,
-  tokenMint: web3.PublicKey,
-  governor: web3.PublicKey,
-  voterProgram: Program<MetVoter>
-) {
-  const [locker, _bump] = deriveLocker(baseKeypair.publicKey, voterProgram.programId);
-
-  console.log("Creating locker", locker.toBase58());
-
-  const onchainTimestamp = await getOnChainTime(
-    voterProgram.provider.connection
-  );
-  const expireTimestamp = new BN(onchainTimestamp).add(expiration);
-
-  const tx = await voterProgram.methods
-    .newLocker(expireTimestamp, {
-      maxStakeDuration,
-      maxStakeVoteMultiplier,
-      minStakeDuration,
-      proposalActivationMinVotes,
-    })
-    .accounts({
-      locker,
-      tokenMint,
-      governor,
-      payer: voterProgram.provider.publicKey,
-      systemProgram: web3.SystemProgram.programId,
-    })
-    .rpc();
-
-  console.log("Create locker tx", tx);
-
-  return locker;
-}
-
 
 export async function createLocker(
   maxStakeDuration: BN,
