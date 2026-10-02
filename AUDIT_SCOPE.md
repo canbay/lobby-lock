@@ -13,7 +13,7 @@ There are two separate asks.
 
 | Ask | What it covers | Written by | Files | Changed lines | Lines of code |
 |---|---|---|---|---|---|
-| **A** | Upstream fixes made after the Offside audit | Jupiter's team | 6 | 60 (54 added, 6 removed) | 47 |
+| **A** | Upstream fixes made after the Offside audit findings, ie changes between `344cc209165eadc52a4c8dd9a0e681b6a659a890` and `fd36cc25b99848a02476156e8f7fcad8589e83de` inclusively | Jupiter's team | 6 | 60 (54 added, 6 removed) | 47 |
 | **B** | Our changes on top | Us | 5 | 21 (18 added, 3 removed) | 18 |
 | | Both together | | 11 | 81 (72 added, 9 removed) | 65 |
 
