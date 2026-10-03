@@ -28,8 +28,9 @@ Changes from WAGMI at the fork commit
   programs/locked-voter/src/lib.rs                         program ID, voting_power instruction
   programs/locked-voter/src/instructions/voting_power.rs   new file
   programs/locked-voter/src/instructions/mod.rs            module export
+  programs/locked-voter/src/instructions/withdraw.rs       transfers the token account's real balance
   Anchor.toml, Cargo.toml, Cargo.lock                      reduced to the three programs above
-  tests/                                                   helpers reduced to the three programs, two stale reward tests reordered, voting_power test added
+  tests/                                                   helpers reduced to the three programs, two stale reward tests reordered, voting_power and withdraw tests added
 
   Removed: programs/met-voter, programs/merkle-distributor, cli, .github, and
   their tests. None of them is compiled into the three programs.

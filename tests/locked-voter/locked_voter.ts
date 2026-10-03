@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { BN, Wallet, web3 } from "@coral-xyz/anchor";
-import { TOKEN_PROGRAM_ID, createMint, mintTo } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, createMint, mintTo, transfer } from "@solana/spl-token";
 import {
   GOVERN_PROGRAM_ID,
   IProposalInstruction,
@@ -828,6 +828,83 @@ describe("Locked voter", () => {
       })
       .rpc();
 
+  });
+
+  it("dust sent to the escrow vault does not block withdraw", async () => {
+    const victim = (await createAndFundWallet(provider.connection)).keypair;
+    const victimProgram = createLockedVoterProgram(new Wallet(victim), LOCKED_VOTER_PROGRAM_ID);
+    const [escrow] = deriveEscrow(locker, victim.publicKey, LOCKED_VOTER_PROGRAM_ID);
+
+    const victimATA = await getOrCreateATA(rewardMint, victim.publicKey, victim, provider.connection);
+    await mintTo(provider.connection, keypair, rewardMint, victimATA, keypair.publicKey, lockAmount.toNumber());
+
+    await victimProgram.methods
+      .newEscrow()
+      .accounts({
+        escrow,
+        escrowOwner: victim.publicKey,
+        locker,
+        payer: victim.publicKey,
+        systemProgram: web3.SystemProgram.programId,
+      })
+      .rpc();
+    const escrowATA = await getOrCreateATA(rewardMint, escrow, victim, provider.connection);
+
+    await victimProgram.methods
+      .extendLockDuration(maxStakeDuration)
+      .accounts({ escrow, escrowOwner: victim.publicKey, locker })
+      .rpc();
+    await victimProgram.methods
+      .increaseLockedAmount(lockAmount)
+      .accounts({
+        escrow,
+        escrowTokens: escrowATA,
+        locker,
+        payer: victim.publicKey,
+        sourceTokens: victimATA,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const attacker = (await createAndFundWallet(provider.connection)).keypair;
+    const attackerATA = await getOrCreateATA(rewardMint, attacker.publicKey, attacker, provider.connection);
+    await mintTo(provider.connection, keypair, rewardMint, attackerATA, keypair.publicKey, 1);
+    await transfer(provider.connection, attacker, attackerATA, escrowATA, attacker, 1);
+
+    const escrowState = await victimProgram.account.escrow.fetch(escrow);
+    const vaultBalance = await provider.connection
+      .getTokenAccountBalance(escrowATA)
+      .then((b) => b.value.amount);
+    expect(escrowState.amount.toString()).to.equal(lockAmount.toString());
+    expect(vaultBalance).to.equal(lockAmount.addn(1).toString());
+
+    while (escrowState.escrowEndsAt.toNumber() >= (await getOnChainTime(provider.connection))) {
+      await sleep(1000);
+    }
+
+    const lockedSupplyBefore = (await victimProgram.account.locker.fetch(locker)).lockedSupply;
+
+    await victimProgram.methods
+      .withdraw()
+      .accounts({
+        destinationTokens: victimATA,
+        escrow,
+        escrowOwner: victim.publicKey,
+        escrowTokens: escrowATA,
+        locker,
+        payer: victim.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const victimBalance = await provider.connection
+      .getTokenAccountBalance(victimATA)
+      .then((b) => b.value.amount);
+    const lockedSupplyAfter = (await victimProgram.account.locker.fetch(locker)).lockedSupply;
+    expect(victimBalance).to.equal(lockAmount.addn(1).toString());
+    expect(lockedSupplyBefore.sub(lockedSupplyAfter).toString()).to.equal(lockAmount.toString());
+    expect(await provider.connection.getAccountInfo(escrowATA)).to.be.null;
+    expect(await provider.connection.getAccountInfo(escrow)).to.be.null;
   });
 
 });

@@ -35,7 +35,7 @@ impl<'info> Withdraw<'info> {
 
         // transfer tokens from the escrow
         // if there are zero tokens in the escrow, short-circuit.
-        if self.escrow.amount > 0 {
+        if self.escrow_tokens.amount > 0 {
             token::transfer(
                 CpiContext::new(
                     self.token_program.to_account_info(),
@@ -46,7 +46,7 @@ impl<'info> Withdraw<'info> {
                     },
                 )
                 .with_signer(seeds),
-                self.escrow.amount,
+                self.escrow_tokens.amount,
             )?;
         }
 

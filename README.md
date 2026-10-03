@@ -10,9 +10,10 @@ This repository is a fork of https://github.com/TeamRaccoons/WAGMI, the lock pro
 
 - **Program IDs.** Our own, in the three programs.
 - **A read-only `voting_power` instruction** on `locked-voter`. It takes a locker and an escrow and returns the escrow's current voting power. It reuses the program's existing formula and writes nothing.
+- **A fix to `withdraw`.** It transfers the escrow token account's real balance, so tokens sent to that account by a third party can no longer block a withdrawal.
 - **Unused code removed.** The upstream programs, tools and CI that we do not deploy are deleted.
 
-The lock's behaviour is unchanged.
+Apart from the `withdraw` fix, the lock's behaviour is unchanged.
 
 ## Layout
 

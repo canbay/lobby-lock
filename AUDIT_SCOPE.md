@@ -14,14 +14,14 @@ There are two separate asks.
 | Ask | What it covers | Written by | Files | Changed lines | Lines of code |
 |---|---|---|---|---|---|
 | **A** | Upstream fixes made after the Offside audit findings, ie changes between `344cc209165eadc52a4c8dd9a0e681b6a659a890` and `fd36cc25b99848a02476156e8f7fcad8589e83de` inclusively | Jupiter's team | 6 | 60 (54 added, 6 removed) | 47 |
-| **B** | Our changes on top | Us | 5 | 21 (18 added, 3 removed) | 18 |
-| | Both together | | 11 | 81 (72 added, 9 removed) | 65 |
+| **B** | Our changes on top | Us | 6 | 25 (20 added, 5 removed) | 22 |
+| | Both together | | 11 | 85 (74 added, 11 removed) | 69 |
 
 "Changed lines" is what `git diff` reports. "Lines of code" leaves out comments and blank lines.
 The audited baseline is 3,339 lines of code.
 
 Ask A is upstream code that we inherit and did not write. One of its five commits has no prior review that we know of.
-Ask B is the only code we wrote. It does not change how the lock behaves.
+Ask B is the only code we wrote. It adds one read-only instruction and fixes one bug in `withdraw` that ask A introduced.
 
 ## 2. The commits
 
@@ -29,7 +29,7 @@ Ask B is the only code we wrote. It does not change how the lock behaves.
 |---|---|---|
 | **Baseline** | `344cc209165eadc52a4c8dd9a0e681b6a659a890` | Upstream code audited by Offside Labs, 7 to 15 March 2024. Report in `audits/` |
 | **Fork point** | `fd36cc25b99848a02476156e8f7fcad8589e83de` | Upstream, 25 March 2024. The baseline plus the five commits of ask A |
-| **Review target** | The single commit on `main` above the fork point | The fork point plus ask B. It will be tagged `audit-1` when frozen |
+| **Review target** | The tip of `main` | The fork point plus ask B. It will be tagged `audit-1` when frozen |
 
 Upstream is https://github.com/TeamRaccoons/WAGMI, the lock programs behind Jupiter's DAO. This repository is a GitHub fork of it.
 
@@ -56,6 +56,8 @@ Five upstream commits, 6 files.
 
 `d0367fd` is not mentioned in the report's mitigation log.
 
+`f744c77` introduced a bug: it made `withdraw` fail whenever the escrow's token account held more than the escrow's recorded amount. Ask B fixes it. See "The withdraw fix" in section 4.
+
 Upstream later added partial unstaking (PR #51, commit `806e9d8`). It is **not** in this repository.
 
 ## 4. Ask B: our changes
@@ -67,6 +69,7 @@ Upstream later added partial unstaking (PR #51, commit `806e9d8`). It is **not**
 | `programs/locked-voter/src/lib.rs` | `declare_id!` and the `voting_power` handler | 6 | 1 |
 | `programs/locked-voter/src/instructions/voting_power.rs` | New file, the accounts for `voting_power` | 8 | 0 |
 | `programs/locked-voter/src/instructions/mod.rs` | Module export | 2 | 0 |
+| `programs/locked-voter/src/instructions/withdraw.rs` | Transfer the vault's real balance | 2 | 2 |
 
 `govern`, `smart-wallet` and `libs/vipers` change only by program ID.
 
@@ -85,7 +88,21 @@ Upstream later added partial unstaking (PR #51, commit `806e9d8`). It is **not**
 - It writes nothing and moves nothing. It is meant to be called by simulation, or by another program through CPI.
 - The RPC trims trailing zero bytes from return data, so callers pad the value to 8 bytes.
 
-No existing instruction, account layout or formula is changed. Locking, extending, max lock and withdrawing behave exactly as upstream.
+### The withdraw fix
+
+**The bug, reported during review.** `withdraw` transferred `escrow.amount` out of the escrow's token account and then closed that account. SPL Token refuses to close an account that still holds tokens. The account's address is public, so anyone could send it one base unit directly. From then on the transfer left that unit behind, the close failed, and every `withdraw` reverted. The owner's tokens were stuck for good, at a cost to the attacker of one base unit and a fee.
+
+It was introduced by upstream commit `f744c77` (PR #50), the fix for Offside finding 04, which added the close. Upstream later removed the close again in PR #51.
+
+**The fix.** `withdraw` now transfers the token account's real balance, `escrow_tokens.amount`, where it used to transfer `escrow.amount`. Two lines change.
+
+- The token account always ends up empty, so the close succeeds. Offside finding 04 stays fixed.
+- Anything sent to the account directly goes to the owner along with their own tokens.
+- Accounting is unchanged. `locked_supply` still goes down by `escrow.amount`, and the event still reports `escrow.amount`.
+
+`tests/locked-voter/locked_voter.ts` has a test for it: a third party sends one base unit to a locked escrow's token account, and after expiry the owner withdraws successfully, receives the locked amount plus that unit, and both accounts are closed. Before the fix the same withdraw failed with SPL Token error `0xb`.
+
+Apart from this fix, no existing instruction, account layout or formula is changed.
 
 ### Changes outside the code in scope
 
@@ -98,13 +115,13 @@ No existing instruction, account layout or formula is changed. Locking, extendin
 | `tests/` | Tests and helpers for the deleted programs removed. Program IDs updated. Two calls reordered in each of the two governor reward tests. `tests/locked-voter/voting_power.ts` added |
 | Added | `AUDIT_SCOPE.md`, `README.md`, `LICENSE`, `NOTICE`, `licenses/`, `build.sh`, `reference/`, `audits/` |
 
-Before the `voting_power` instruction was added, this trimmed workspace and the full upstream tree with only the program IDs changed built to byte-identical binaries. `govern.so` and `smart_wallet.so` still do.
+In one build environment, before ask B's code changes were made, this trimmed workspace and the full upstream tree with only the program IDs changed built to byte-identical binaries.
 
 ## 5. Questions for the review
 
 1. **Identity.** Is the review target exactly the baseline plus asks A and B in the four folders in scope, with nothing else changed?
 2. **Ask A.** Are the five upstream commits correct and safe? Please give particular attention to `d0367fd`.
-3. **Ask B.** Are the account constraints and return value of `voting_power` correct and safe, including when called through CPI?
+3. **Ask B.** Are the account constraints and return value of `voting_power` correct and safe, including when called through CPI? Is the `withdraw` fix complete, and does anything else in the programs depend on a token account's balance matching recorded amounts?
 4. **Prior findings.** What is the status at the review target of the five Offside findings, including the two that were acknowledged and not fixed: finding 03, voting power timing, and finding 05, transactions that cannot be closed?
 5. **Binary identity.** Are the binaries we deploy built from the review target?
 6. **Configuration.** Are the deployment parameters and key setup in section 7 safe?
@@ -116,9 +133,9 @@ Run on a local validator with the binaries built from this tree:
 
 | Suite | Result |
 |---|---|
-| `tests/locked-voter/locked_voter.ts`, upstream | 14 passing |
+| `tests/locked-voter/locked_voter.ts`, upstream plus our withdraw test | 15 passing |
 | `tests/locked-voter/voting_power.ts`, ours | 5 passing |
-| `tests/smartwallet`, upstream | 15 passing, with one intermittent setup failure, see below |
+| `tests/smartwallet`, upstream | 15 passing, see the note on startup below |
 | `tests/govern`, upstream, two tests reordered | 16 passing |
 
 The upstream lock suite covers locking, extending, the minimum and maximum duration checks, vote delegation, max lock, and withdrawing after expiry.
@@ -127,7 +144,7 @@ Our suite covers `voting_power` for an empty escrow, a timed lock against the fo
 Three things about these runs that you should know:
 
 - **Two upstream governor tests were stale.** `claimReward.ts` and `claimRewardOptionProposal.ts` added tokens to an escrow before setting its duration. Upstream's own fix for Offside finding 01 made that order invalid, and upstream never updated the tests, so they fail on upstream's code at the fork point. We swapped the two calls in each file. Nothing else in those files changed.
-- **One upstream multisig setup step is flaky here.** The "before all" hook of the "Happy path" group in `tests/smartwallet` failed in 2 of 4 runs with "invalid account data for instruction", which skips 5 tests. In the other runs all 15 pass. `smart-wallet` differs from upstream only by its program ID.
+- **The multisig suite races the test validator at startup.** Run through `anchor test`, its setup hooks sometimes fail with "invalid account data for instruction", because the suite's first transactions arrive before the programs loaded at genesis are callable. The other suites begin with airdrops and do not hit this. Against a validator that had been up for 6 seconds, all 15 tests passed in 3 runs out of 3. `smart-wallet` differs from upstream only by its program ID.
 - **Environment.** Node 20 on macOS. Upstream's `package-lock.json` does not match its `package.json`, so dependencies were installed without it and resolved to current versions.
 
 ```sh
@@ -138,11 +155,11 @@ Hashes of our local builds, on macOS:
 
 | Binary | SHA-256 |
 |---|---|
-| `locked_voter.so` | `9eaf2d9ef9479f54393b96a105e951a8dd270110a814db43e562133d697f5fdd` |
-| `govern.so` | `2912baedcb869432da4da409c8b3d7572719d710e0a5f2197dca361a830f053a` |
-| `smart_wallet.so` | `dd8e20ed9aedac2ac2b9196dfa4609b3010988a4baaa97f74b77acc436e672e5` |
+| `locked_voter.so` | `115fc383eedb7194cec6abdb10eb837b59f25750a376e61c80337d6724e07667` |
+| `govern.so` | `d1f2b2e3f25cd0df695b1440c07a5cd1bb33deec449ab2854ca03787e3ccd175` |
+| `smart_wallet.so` | `642c6c7cb7a2edba698fe9623399624100c063ff0b22ef874fb2ae146dbd74ed` |
 
-**These are not reproducible hashes.** A local build embeds paths from the build machine. Hashes from a pinned verifiable-build container will replace them before the review starts.
+**These are not reproducible hashes.** A local build embeds paths from the build machine. The `govern.so` and `smart_wallet.so` hashes above differ from an earlier draft of this document although their source did not change, only because the toolchain was reinstalled in a different folder. Hashes from a pinned verifiable-build container will replace them before the review starts.
 
 ## 7. Deployment configuration and trust model
 
